@@ -131,12 +131,12 @@ public class TableConfiguration extends PropertyHolder {
 
         insertStatementEnabled = true;
         selectByPrimaryKeyStatementEnabled = true;
-        selectByExampleStatementEnabled = true;
+//        selectByExampleStatementEnabled = true;
         updateByPrimaryKeyStatementEnabled = true;
         deleteByPrimaryKeyStatementEnabled = true;
-        deleteByExampleStatementEnabled = true;
-        countByExampleStatementEnabled = true;
-        updateByExampleStatementEnabled = true;
+//        deleteByExampleStatementEnabled = true;
+//        countByExampleStatementEnabled = true;
+//        updateByExampleStatementEnabled = true;
     }
 
     /**
