@@ -35,6 +35,7 @@ import static org.mybatis.generator.internal.util.messages.Messages.getString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
 import java.util.Properties;
 
 import org.mybatis.generator.config.ColumnOverride;
@@ -58,6 +59,7 @@ import org.mybatis.generator.config.SqlMapGeneratorConfiguration;
 import org.mybatis.generator.config.TableConfiguration;
 import org.mybatis.generator.exception.XMLParserException;
 import org.mybatis.generator.internal.ObjectFactory;
+import org.mybatis.generator.internal.util.JavaBeansUtil;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
@@ -107,8 +109,21 @@ public class MyBatisGeneratorConfigurationParser {
         return configuration;
     }
 
+    //所以重点是三个方法：parseProperties/parseClassPathEntry/parseContext
+
+    /**
+     * parseProperties方法最重要的就是加载指定的properties配置到properties中，
+     * 【注意】，因为在<generatorConfiguration>元素中的<properties>元素最重要的就是用来替换在配置文件中所有的${key}占位符，
+     * 所以，properties元素只需要在解析过程存在，所以可以看到properties属性是只需要在MyBatisGeneratorConfigurationParser中使用；
+     *
+     * @param configuration
+     * @param node
+     * @throws XMLParserException
+     */
     protected void parseProperties(Configuration configuration, Node node)
             throws XMLParserException {
+
+        //解析得到URL或者resource属性（两种配置的加载方式）
         Properties attributes = parseAttributes(node);
         String resource = attributes.getProperty("resource"); //$NON-NLS-1$
         String url = attributes.getProperty("url"); //$NON-NLS-1$
@@ -123,6 +138,7 @@ public class MyBatisGeneratorConfigurationParser {
             throw new XMLParserException(getString("RuntimeError.14")); //$NON-NLS-1$
         }
 
+        //统一把resource/URL转成URL；
         URL resourceUrl;
 
         try {
@@ -136,6 +152,7 @@ public class MyBatisGeneratorConfigurationParser {
                 resourceUrl = new URL(url);
             }
 
+            //从URL加载properties文件并载入；
             InputStream inputStream = resourceUrl.openConnection()
                     .getInputStream();
 
@@ -152,8 +169,14 @@ public class MyBatisGeneratorConfigurationParser {
         }
     }
 
+    /**
+     * 解析context元素
+     * @param configuration
+     * @param node
+     */
     private void parseContext(Configuration configuration, Node node) {
 
+        //解析出context元素上的所有属性，并把所有属性放到一个properties中；
         Properties attributes = parseAttributes(node);
         String defaultModelType = attributes.getProperty("defaultModelType"); //$NON-NLS-1$
         String targetRuntime = attributes.getProperty("targetRuntime"); //$NON-NLS-1$
@@ -161,9 +184,17 @@ public class MyBatisGeneratorConfigurationParser {
                 .getProperty("introspectedColumnImpl"); //$NON-NLS-1$
         String id = attributes.getProperty("id"); //$NON-NLS-1$
 
+        /**
+         * 得到默认的生成对象的样式(ModeType是一个简单的枚举)
+         * public enum ModelType {
+         HIERARCHICAL("hierarchical"),FLAT("flat"),CONDITIONAL("conditional");
+         }
+         ModelType的getModelType只是很简单的根据string返回对应的类型或者报错
+         */
         ModelType mt = defaultModelType == null ? null : ModelType
                 .getModelType(defaultModelType);
 
+        //创建一个Context对象
         Context context = new Context(mt);
         context.setId(id);
         if (stringHasValue(introspectedColumnImpl)) {
@@ -173,8 +204,10 @@ public class MyBatisGeneratorConfigurationParser {
             context.setTargetRuntime(targetRuntime);
         }
 
+        //先添加到配置对象的context列表中，
         configuration.addContext(context);
 
+        //再解析<context>子元素
         NodeList nodeList = node.getChildNodes();
         for (int i = 0; i < nodeList.getLength(); i++) {
             Node childNode = nodeList.item(i);
@@ -183,6 +216,8 @@ public class MyBatisGeneratorConfigurationParser {
                 continue;
             }
 
+            //以下的内容就很模式化了，只是依次把context的不同子元素解析，并添加到Context对象中；
+            // 所以我们就先不看每一个具体的解析代码，先看一下Context对象的结构；
             if ("property".equals(childNode.getNodeName())) { //$NON-NLS-1$
                 parseProperty(context, childNode);
             } else if ("plugin".equals(childNode.getNodeName())) { //$NON-NLS-1$
@@ -234,14 +269,38 @@ public class MyBatisGeneratorConfigurationParser {
     }
 
     protected void parseTable(Context context, Node node) {
-        TableConfiguration tc = new TableConfiguration(context);
-        context.addTableConfiguration(tc);
 
         Properties attributes = parseAttributes(node);
-        String catalog = attributes.getProperty("catalog"); //$NON-NLS-1$
-        String schema = attributes.getProperty("schema"); //$NON-NLS-1$
         String tableName = attributes.getProperty("tableName"); //$NON-NLS-1$
+        String match = attributes.getProperty("match");
         String domainObjectName = attributes.getProperty("domainObjectName"); //$NON-NLS-1$
+        
+        
+		if ("all".equalsIgnoreCase(tableName)) {
+			List<String> list = context.getAllTables();
+			for (String table : list) {
+				if ((match != null) && (!table.matches(match))) {
+					continue;
+				}
+
+				tableName = table;
+
+				domainObjectName = JavaBeansUtil.getCamelCaseString(table, true);
+				parseTable(context, node, tableName, domainObjectName, attributes);
+			}
+		} else {
+			parseTable(context, node, tableName, domainObjectName, attributes);
+		}
+
+    	
+    }
+
+	private void parseTable(Context context, Node node, String tableName, String domainObjectName, Properties attributes) {
+		TableConfiguration tc = new TableConfiguration(context);
+    	context.addTableConfiguration(tc);
+    	
+    	String catalog = attributes.getProperty("catalog"); //$NON-NLS-1$
+        String schema = attributes.getProperty("schema"); //$NON-NLS-1$
         String alias = attributes.getProperty("alias"); //$NON-NLS-1$
         String enableInsert = attributes.getProperty("enableInsert"); //$NON-NLS-1$
         String enableSelectByPrimaryKey = attributes
@@ -384,7 +443,7 @@ public class MyBatisGeneratorConfigurationParser {
                 parseColumnRenamingRule(tc, childNode);
             }
         }
-    }
+	}
 
     private void parseColumnOverride(TableConfiguration tc, Node node) {
         Properties attributes = parseAttributes(node);
@@ -693,6 +752,14 @@ public class MyBatisGeneratorConfigurationParser {
         return attributes;
     }
 
+
+    /**
+     * properties的方法主要就是提供给这个方法使用：
+     * 在配置文件中所有的属性值都先使用${}占位符去测试一下，
+     * 如果是占位符，就把${}中的值作为key去properties中查找，把查找到的值作为属性真正的值返回；
+     * @param string
+     * @return
+     */
     private String parsePropertyTokens(String string) {
         final String OPEN = "${"; //$NON-NLS-1$
         final String CLOSE = "}"; //$NON-NLS-1$
