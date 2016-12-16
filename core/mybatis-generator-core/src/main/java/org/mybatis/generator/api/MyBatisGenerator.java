@@ -326,7 +326,98 @@ public class MyBatisGenerator {
             callback.checkCancel();
             callback.startTask(getString(
                     "Progress.15", targetFile.getName())); //$NON-NLS-1$
-            writeFile(targetFile, source, gjf.getFileEncoding());
+//            writeFile(targetFile, source, gjf.getFileEncoding());
+            
+            
+            String modelName = targetFile.getName().replace(".java", "");
+            modelName = modelName.replace("Mapper", "");
+            modelName = modelName.replace("Example", "");
+
+            String modelNameEss = new StringBuilder().append(modelName).append("Ess").toString();
+
+            String parentPackage = gjf.getTargetPackage().substring(0, gjf.getTargetPackage().lastIndexOf("."));
+            parentPackage = parentPackage.substring(0, parentPackage.lastIndexOf("."));
+
+            if (targetFile.getName().endsWith("Mapper.java"))
+            {
+              source = source.replace(modelName, modelNameEss);
+              source = source.replace(new StringBuilder().append(modelNameEss).append("Example").toString(), new StringBuilder().append(modelName).append("Example").toString());
+              source = source.replace(new StringBuilder().append(modelNameEss).append("Mapper").toString(), new StringBuilder().append(modelName).append("MapperEss").toString());
+
+              GeneratedJavaFile modelJavaFile = findJavaFile(modelName);
+              source = source.replace(new StringBuilder().append(modelJavaFile.getTargetPackage()).append(".").append(modelName).append("Ess").toString(), new StringBuilder().append(parentPackage).append(".model.").append(modelName).toString());
+              source = source.replace(new StringBuilder().append(modelName).append("Ess").toString(), modelName);
+
+              File f = new File(new StringBuilder().append(targetFile.getParent()).append("/").append(modelName).append("MapperEss.java").toString());
+              writeFile(f, source, gjf.getFileEncoding());
+
+              String repName = "";
+
+              File serviceFile = new File(new StringBuilder().append(new StringBuilder().append(gjf.getTargetProject()).append(".").append(parentPackage).append(".service.").toString().replace(".", "/")).append("/").append(modelName).append("Service.java").toString());
+              repName = serviceFile.getName().replace("Service.java", "");
+              repName = new StringBuilder().append(repName.substring(0, 1).toLowerCase()).append(repName.substring(1)).toString();
+              if (!serviceFile.exists()) {
+                StringBuffer sbuf = new StringBuffer();
+                sbuf.append(new StringBuilder().append("package ").append(parentPackage).append(".service;\n").toString());
+                sbuf.append("\n");
+                sbuf.append(new StringBuilder().append("import ").append(parentPackage).append(".dao.").append(modelName).append("Mapper;\n").toString());
+                sbuf.append("import org.springframework.stereotype.Service;\n");
+                sbuf.append("import org.springframework.beans.factory.annotation.Autowired;\n");
+                sbuf.append("\n");
+                sbuf.append(new StringBuilder().append("@Service(\"").append(repName).append("Service\")\n").toString());
+                sbuf.append(new StringBuilder().append("public class ").append(modelName).append("Service {\n").toString());
+                sbuf.append("\t@Autowired \n");
+                sbuf.append(new StringBuilder().append("\tprivate ").append(modelName).append("Mapper ").append(repName).append("Mapper; \n").toString());
+                sbuf.append("}\n");
+                writeFile(serviceFile, sbuf.toString(), gjf.getFileEncoding());
+              } else {
+                System.out.println(new StringBuilder().append(serviceFile.getAbsolutePath()).append(" exists!").toString());
+              }
+
+              File mapperFile = new File(new StringBuilder().append(new StringBuilder().append(gjf.getTargetProject()).append(".").append(parentPackage).append(".dao.").toString().replace(".", "/")).append("/").append(modelName).append("Mapper.java").toString());
+              repName = mapperFile.getName().replace("Mapper.java", "");
+              repName = new StringBuilder().append(repName.substring(0, 1).toLowerCase()).append(repName.substring(1)).toString();
+              if (!mapperFile.exists()) {
+                StringBuffer sbuf = new StringBuffer();
+                sbuf.append(new StringBuilder().append("package ").append(parentPackage).append(".dao;\n").toString());
+                sbuf.append("\n");
+                sbuf.append(new StringBuilder().append("import ").append(findJavaFile(new StringBuilder().append(modelName).append("Mapper").toString()).getTargetPackage()).append(".").append(modelName).append("MapperEss;\n").toString());
+                sbuf.append("import org.springframework.stereotype.Repository;\n");
+                sbuf.append("\n");
+                sbuf.append(new StringBuilder().append("@Repository(\"").append(repName).append("Mapper\")\n").toString());
+                sbuf.append(new StringBuilder().append("public interface ").append(modelName).append("Mapper extends ").append(modelName).append("MapperEss {\n").toString());
+                sbuf.append("}\n");
+                writeFile(mapperFile, sbuf.toString(), gjf.getFileEncoding());
+              } else {
+                System.out.println(new StringBuilder().append(mapperFile.getAbsolutePath()).append(" exists!").toString());
+              }
+            } else if (targetFile.getName().endsWith("Example.java")) {
+              File f = new File(new StringBuilder().append(targetFile.getParent()).append("/").append(modelName).append("Example.java").toString());
+              writeFile(f, source, gjf.getFileEncoding());
+            }
+            else {
+              source = source.replace(new StringBuilder().append("public class ").append(modelName).append(" {").toString(), new StringBuilder().append("public class ").append(modelNameEss).append(" {").toString());
+              File f = new File(new StringBuilder().append(targetFile.getParent()).append("/").append(modelNameEss).append(".java").toString());
+              writeFile(f, source, gjf.getFileEncoding());
+
+              File modelFile = new File(new StringBuilder().append(new StringBuilder().append(gjf.getTargetProject()).append(".").append(parentPackage).append(".model.").toString().replace(".", "/")).append("/").append(modelName).append(".java").toString());
+              String repName = modelFile.getName().replace(".java", "");
+              repName = new StringBuilder().append(repName.substring(0, 1).toLowerCase()).append(repName.substring(1)).toString();
+              if (!modelFile.exists()) {
+                StringBuffer sbuf = new StringBuffer();
+                sbuf.append(new StringBuilder().append("package ").append(parentPackage).append(".model;\n").toString());
+                sbuf.append("\n");
+                sbuf.append(new StringBuilder().append("import ").append(findJavaFile(modelName).getTargetPackage()).append(".").append(modelName).append("Ess;\n").toString());
+                sbuf.append("\n");
+                sbuf.append(new StringBuilder().append("public class ").append(modelName).append(" extends ").append(modelName).append("Ess {\n").toString());
+                sbuf.append("}\n");
+                writeFile(modelFile, sbuf.toString(), gjf.getFileEncoding());
+              } else {
+                System.out.println(new StringBuilder().append(modelFile.getAbsolutePath()).append(" exists!").toString());
+              }
+            }
+            
+            
         } catch (ShellException e) {
             warnings.add(e.getMessage());
         }
@@ -362,12 +453,76 @@ public class MyBatisGenerator {
             callback.checkCancel();
             callback.startTask(getString(
                     "Progress.15", targetFile.getName())); //$NON-NLS-1$
-            writeFile(targetFile, source, "UTF-8"); //$NON-NLS-1$
+//            writeFile(targetFile, source, "UTF-8"); //$NON-NLS-1$
+            
+            if (targetFile.getName().endsWith("Mapper.xml"))
+            {
+              String modelName = targetFile.getName().replace(".xml", "");
+              modelName = modelName.replace("Mapper", "");
+
+              String mapperName = targetFile.getName().replace(".xml", "");
+
+              GeneratedJavaFile mapperJavaFile = findJavaFile(mapperName);
+              GeneratedJavaFile modelJavaFile = findJavaFile(modelName);
+
+              String parentPackage = modelJavaFile.getTargetPackage().substring(0, modelJavaFile.getTargetPackage().lastIndexOf("."));
+              parentPackage = parentPackage.substring(0, parentPackage.lastIndexOf("."));
+
+              if (mapperJavaFile != null)
+              {
+                source = source.replace(new StringBuilder().append(mapperJavaFile.getTargetPackage()).append(".").append(mapperName).toString(), new StringBuilder().append(parentPackage).append(".dao.").append(mapperName).toString());
+                if (modelJavaFile != null) {
+                  source = source.replace(new StringBuilder().append(modelJavaFile.getTargetPackage()).append(".").append(modelName).toString(), new StringBuilder().append(parentPackage).append(".model.").append(modelName).toString());
+                  source = source.replace(new StringBuilder().append(parentPackage).append(".model.").append(modelName).append("Example").toString(), new StringBuilder().append(modelJavaFile.getTargetPackage()).append(".").append(modelName).append("Example").toString());
+                }
+                writeFile(targetFile, source, "UTF-8");
+
+                String parentXmlPackage = gxf.getTargetPackage();
+                int idx = parentXmlPackage.lastIndexOf("/");
+                if (idx > 0) {
+                  parentXmlPackage = parentXmlPackage.substring(0, parentXmlPackage.lastIndexOf("/"));
+                }
+
+                idx = parentXmlPackage.lastIndexOf("\\");
+                if (idx > 0) {
+                  parentXmlPackage = parentXmlPackage.substring(0, parentXmlPackage.lastIndexOf("\\"));
+                }
+
+                parentXmlPackage = new StringBuilder().append(gxf.getTargetProject()).append("/").append(parentXmlPackage).toString();
+
+                File _targetFile = new File(new StringBuilder().append(parentXmlPackage).append("/").append(mapperName).append(".xml").toString());
+                if (!_targetFile.exists()) {
+                  StringBuffer sbuf = new StringBuffer();
+                  sbuf.append("<?xml version=\"1.0\" encoding=\"GBK\" ?>\n");
+                  sbuf.append("<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"http://mybatis.org/dtd/mybatis-3-mapper.dtd\" >\n");
+                  sbuf.append(new StringBuilder().append("<mapper namespace=\"").append(parentPackage).append(".dao.").append(mapperName).append("\" >\n").toString());
+                  sbuf.append("\n");
+                  sbuf.append("</mapper>\n");
+                  writeFile(_targetFile, sbuf.toString(), "UTF-8");
+                } else {
+                  System.out.println(new StringBuilder().append(_targetFile.getAbsolutePath()).append(" exists!").toString());
+                }
+              } else {
+                writeFile(targetFile, source, "UTF-8");
+              }
+            }
+            
         } catch (ShellException e) {
             warnings.add(e.getMessage());
         }
     }
     
+    private GeneratedJavaFile findJavaFile(String javaName) {
+        GeneratedJavaFile targetFile = null;
+        for (GeneratedJavaFile _gjf : this.generatedJavaFiles) {
+          if (_gjf.getFileName().replace(".java", "").equals(javaName)) {
+            targetFile = _gjf;
+            break;
+          }
+        }
+        return targetFile;
+      }
+
     /**
      * Writes, or overwrites, the contents of the specified file.
      *
