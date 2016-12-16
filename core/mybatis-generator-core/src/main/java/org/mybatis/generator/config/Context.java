@@ -21,6 +21,8 @@ import static org.mybatis.generator.internal.util.StringUtility.stringHasValue;
 import static org.mybatis.generator.internal.util.messages.Messages.getString;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,64 +51,102 @@ import org.mybatis.generator.internal.db.DatabaseIntrospector;
  * @author Jeff Butler
  */
 public class Context extends PropertyHolder {
-    
-    /** The id. */
+
+    /**
+     * context的id
+     */
     private String id;
 
-    /** The jdbc connection configuration. */
+    /**
+     * jdbc连接配置，包装成JDBCConnectionConfiguration 对象，对应<jdbcConnection>元素
+     */
     private JDBCConnectionConfiguration jdbcConnectionConfiguration;
     
     private ConnectionFactoryConfiguration connectionFactoryConfiguration;
 
-    /** The sql map generator configuration. */
+    /**
+     * 生成SQL MAP的xml配置，对应<sqlMapGenerator>元素，包装成 SqlMapGeneratorConfiguration 对象
+     */
     private SqlMapGeneratorConfiguration sqlMapGeneratorConfiguration;
 
-    /** The java type resolver configuration. */
+    /**
+     * 生成java类型处理器配置，对应<javaTypeResolver>元素，包装成 JavaTypeResolverConfiguration 对象
+     */
     private JavaTypeResolverConfiguration javaTypeResolverConfiguration;
 
-    /** The java model generator configuration. */
+    /**
+     * 生成java模型创建器配置，对应<javaModelGenerator>元素，包装成 JavaModelGeneratorConfiguration 对象
+     */
     private JavaModelGeneratorConfiguration javaModelGeneratorConfiguration;
 
-    /** The java client generator configuration. */
+    /**
+     * 生成Mapper接口配置，对应<javaClientGenerator>元素，包装成 JavaClientGeneratorConfiguration 对象
+     */
     private JavaClientGeneratorConfiguration javaClientGeneratorConfiguration;
 
-    /** The table configurations. */
+    /**
+     * 解析每一个<table>元素，并包装成一个一个的TableConfiguration对象
+     */
     private ArrayList<TableConfiguration> tableConfigurations;
 
-    /** The default model type. */
+    /**
+     * 生成对象样式，对应context元素的defaultModelType属性(attribute)
+     */
     private ModelType defaultModelType;
 
-    /** The beginning delimiter. */
+    /**
+     * 对应context元素的beginningDelimiter这个property子元素（注意属性和property的区别）
+     */
     private String beginningDelimiter = "\""; //$NON-NLS-1$
 
-    /** The ending delimiter. */
+    /**
+     * 对应context元素的endingDelimiter 这个property子元素
+     */
     private String endingDelimiter = "\""; //$NON-NLS-1$
 
-    /** The comment generator configuration. */
+    /**
+     * 对应<commentGenerator>元素，注解生成器的配置
+     */
     private CommentGeneratorConfiguration commentGeneratorConfiguration;
 
-    /** The comment generator. */
+    /**
+     * 注解生成器
+     */
     private CommentGenerator commentGenerator;
 
-    /** The plugin aggregator. */
+    /**
+     * 这是一个包装了所有的plugin的插件执行对象，其中的插件就是由pluginConfigurations中的每一个PluginConfiguration生成
+     */
     private PluginAggregator pluginAggregator;
 
-    /** The plugin configurations. */
+    /**
+     * 对应每一个<plugin>元素的配置
+     */
     private List<PluginConfiguration> pluginConfigurations;
 
-    /** The target runtime. */
+    /**
+     * 目标运行时，对应context元素的targetRuntime属性(attribute)
+     */
     private String targetRuntime;
 
-    /** The introspected column impl. */
+    /**
+     * 对应context元素的introspectedColumnImpl属性(attribute)
+     */
     private String introspectedColumnImpl;
 
-    /** The auto delimit keywords. */
+    /**
+     * 自动识别数据库关键字，对应context元素的autoDelimitKeywords这个property子元素
+     */
     private Boolean autoDelimitKeywords;
-    
-    /** The java formatter. */
+
+    /**
+     * Java代码格式化工具，对应context元素的javaFormatter这个property子元素
+     */
     private JavaFormatter javaFormatter;
-    
-    /** The xml formatter. */
+
+    /**
+     * Xml代码格式化工具，对应context元素的xmlFormatter这个property子元素
+     */
     private XmlFormatter xmlFormatter;
     
     /**
@@ -703,6 +743,8 @@ public class Context extends PropertyHolder {
         for (PluginConfiguration pluginConfiguration : pluginConfigurations) {
             Plugin plugin = ObjectFactory.createPlugin(this,
                     pluginConfiguration);
+
+            /* 是否添加插件 */
             if (plugin.validate(warnings)) {
                 pluginAggregator.addPlugin(plugin);
             } else {
@@ -715,6 +757,7 @@ public class Context extends PropertyHolder {
             for (IntrospectedTable introspectedTable : introspectedTables) {
                 callback.checkCancel();
 
+                /* 初始化:包括插件的初始化 */
                 introspectedTable.initialize();
                 introspectedTable.calculateGenerators(warnings, callback);
                 generatedJavaFiles.addAll(introspectedTable
@@ -786,4 +829,27 @@ public class Context extends PropertyHolder {
     public void setConnectionFactoryConfiguration(ConnectionFactoryConfiguration connectionFactoryConfiguration) {
         this.connectionFactoryConfiguration = connectionFactoryConfiguration;
     }
+
+	public List<String> getAllTables() {
+		 List<String> tableList = new ArrayList<String>();
+		    Connection connection = null;
+		    try {
+		      connection = getConnection();
+		      DatabaseMetaData dmd = connection.getMetaData();
+		      String[] types = { "TABLE" };
+		      ResultSet rs = dmd.getTables(null, null, "%", types);
+		      while (rs.next()) {
+		        tableList.add(rs.getString(3));
+		        System.out.println(rs.getString(3));
+		      }
+		      rs.close();
+		    }
+		    catch (SQLException localSQLException) {
+		    }
+		    finally {
+		      closeConnection(connection);
+		    }
+		    return tableList;
+
+	}
 }
